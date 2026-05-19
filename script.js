@@ -14,7 +14,7 @@ const greetings = [
   { text: "Hej, världen!", language: "Swedish", country: "se", countryName: "Sweden" },
   { text: "Hallo, wereld!", language: "Dutch", country: "nl", countryName: "Netherlands" },
   { text: "Witaj, świecie!", language: "Polish", country: "pl", countryName: "Poland" },
-  { text: "Merhaba, Dünya!", language: "Turkish", country: "tr", countryName: "Turkey" },
+  { text: "Merhaba, Dünya!!", language: "Turkish", country: "tr", countryName: "Turkey" },
   { text: "Γειά σου, κόσμε!", language: "Greek", country: "gr", countryName: "Greece" },
   { text: "שלום, עולם!", language: "Hebrew", country: "il", countryName: "Israel" },
   { text: "สวัสดี, โลก!", language: "Thai", country: "th", countryName: "Thailand" },

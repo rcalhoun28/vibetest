@@ -33,14 +33,6 @@ body {
   transform: scale(0.98);
 }
 
-.project-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #e8e8e8;
-  margin-bottom: 1.25rem;
-  letter-spacing: 0.02em;
-}
-
 .hint {
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.45);
@@ -66,11 +58,12 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.15s ease;
+  overflow: hidden;
+  perspective: 400px;
 }
 
-.country-map.fade {
-  opacity: 0;
+.country-map.spinning {
+  pointer-events: none;
 }
 
 .country-map img {
@@ -82,10 +75,48 @@ body {
   opacity: 0.9;
 }
 
+.country-map img.tick {
+  animation: country-tick 0.1s ease-out;
+}
+
+.country-map.landed img {
+  animation: country-land 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes country-tick {
+  0% {
+    transform: scale(0.8) rotateX(25deg);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1) rotateX(0deg);
+    opacity: 0.9;
+  }
+}
+
+@keyframes country-land {
+  0% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  60% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+}
+
 .language {
   font-size: 1rem;
   color: #e94560;
   font-weight: 500;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+  transition: opacity 0.15s ease;
+}
+
+.language.fade {
+  opacity: 0;
 }

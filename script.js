@@ -21,8 +21,6 @@ const greetings = [
   { text: "Xin chào, thế giới!", language: "Vietnamese", country: "vn", countryName: "Vietnam" },
 ];
 
-const countryCodes = greetings.map((g) => g.country);
-
 let index = 0;
 let isSpinning = false;
 
@@ -35,33 +33,38 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function randomCountry(exclude) {
-  let code;
+function randomIndex(exclude) {
+  let i;
   do {
-    code = countryCodes[Math.floor(Math.random() * countryCodes.length)];
-  } while (code === exclude && countryCodes.length > 1);
-  return code;
+    i = Math.floor(Math.random() * greetings.length);
+  } while (i === exclude && greetings.length > 1);
+  return i;
 }
 
-function setCountry(code, name) {
-  countryOutlineEl.src = `countries/${code}.svg`;
-  countryOutlineEl.alt = name ? `${name} outline` : "";
+function applyItem(item, isFinal) {
+  greetingEl.textContent = item.text;
+  languageEl.textContent = item.language;
+  countryOutlineEl.src = `countries/${item.country}.svg`;
+  countryOutlineEl.alt = isFinal ? `${item.countryName} outline` : "";
 }
 
-function pulseCountry() {
-  countryOutlineEl.classList.remove("tick");
-  void countryOutlineEl.offsetWidth;
-  countryOutlineEl.classList.add("tick");
+function pulseTick() {
+  [countryOutlineEl, greetingEl, languageEl].forEach((el) => {
+    el.classList.remove("tick");
+    void el.offsetWidth;
+    el.classList.add("tick");
+  });
 }
 
-async function spinCountryWheel(targetCountry, targetName) {
+async function spinWheel(targetIndex) {
+  const target = greetings[targetIndex];
   const spinCount = 14 + Math.floor(Math.random() * 10);
 
   for (let i = 0; i < spinCount; i++) {
     const isFinal = i === spinCount - 1;
-    const code = isFinal ? targetCountry : randomCountry(targetCountry);
-    setCountry(code, isFinal ? targetName : "");
-    pulseCountry();
+    const item = isFinal ? target : greetings[randomIndex(targetIndex)];
+    applyItem(item, isFinal);
+    pulseTick();
 
     const progress = i / (spinCount - 1);
     const delay = 35 + progress * progress * 280;
@@ -74,26 +77,23 @@ async function showNext() {
   isSpinning = true;
 
   const nextIndex = (index + 1) % greetings.length;
-  const next = greetings[nextIndex];
 
-  greetingEl.classList.add("fade");
-  languageEl.classList.add("fade");
   countryMapEl.classList.add("spinning");
 
-  await spinCountryWheel(next.country, next.countryName);
+  await spinWheel(nextIndex);
 
   index = nextIndex;
-  setCountry(next.country, next.countryName);
-  greetingEl.textContent = next.text;
-  languageEl.textContent = next.language;
-
   countryMapEl.classList.remove("spinning");
   countryMapEl.classList.add("landed");
-  greetingEl.classList.remove("fade");
-  languageEl.classList.remove("fade");
+  greetingEl.classList.add("landed");
+  languageEl.classList.add("landed");
 
   await sleep(400);
+
   countryMapEl.classList.remove("landed");
+  greetingEl.classList.remove("landed", "tick");
+  languageEl.classList.remove("landed", "tick");
+  countryOutlineEl.classList.remove("tick");
   isSpinning = false;
 }
 

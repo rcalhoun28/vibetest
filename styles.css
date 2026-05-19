@@ -33,6 +33,14 @@ body {
   transform: scale(0.98);
 }
 
+.project-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #e8e8e8;
+  margin-bottom: 1.25rem;
+  letter-spacing: 0.02em;
+}
+
 .hint {
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.45);

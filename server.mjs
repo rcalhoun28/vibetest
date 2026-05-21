@@ -1,12 +1,9 @@
-import express from "express";
-import dotenv from "dotenv";
+import http from "http";
+import fs from "fs";
+import path from "path";
 import { fileURLToPath } from "url";
-import { dirname } from "path";
 
-dotenv.config();
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const app = express();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
 
 const LENGTHS = {
@@ -15,6 +12,37 @@ const LENGTHS = {
   extended: 1200,
   comprehensive: 2000,
 };
+
+const MIME = {
+  ".html": "text/html",
+  ".css": "text/css",
+  ".js": "text/javascript",
+  ".json": "application/json",
+  ".svg": "image/svg+xml",
+};
+
+function loadEnv() {
+  try {
+    const envPath = path.join(__dirname, ".env");
+    const text = fs.readFileSync(envPath, "utf8");
+    for (const line of text.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eq = trimmed.indexOf("=");
+      if (eq === -1) continue;
+      const key = trimmed.slice(0, eq).trim();
+      let val = trimmed.slice(eq + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      process.env[key] = val;
+    }
+  } catch {
+    /* no .env file */
+  }
+}
+
+loadEnv();
 
 const SYSTEM_PROMPT = (wordTarget) => `You are an expert academic essayist writing at the college and graduate level.
 
@@ -34,25 +62,64 @@ Requirements:
 
 The essay must read as original scholarly writing suitable for an upper-division college course.`;
 
-app.use(express.json());
-app.use(express.static(__dirname));
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    req.on("data", (chunk) => (data += chunk));
+    req.on("end", () => resolve(data));
+    req.on("error", reject);
+  });
+}
 
-app.get("/api/health", (_req, res) => {
-  res.json({ ready: Boolean(process.env.OPENAI_API_KEY) });
-});
+function sendJson(res, status, obj) {
+  res.writeHead(status, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(obj));
+}
 
-app.post("/api/essay", async (req, res) => {
-  const apiKey = process.env.OPENAI_API_KEY;
+function serveStatic(req, res) {
+  let filePath = req.url.split("?")[0];
+  if (filePath === "/") filePath = "/index.html";
+  const safePath = path.normalize(filePath).replace(/^(\.\.[/\\])+/, "");
+  const fullPath = path.join(__dirname, safePath);
+
+  if (!fullPath.startsWith(__dirname)) {
+    res.writeHead(403);
+    res.end("Forbidden");
+    return;
+  }
+
+  fs.readFile(fullPath, (err, data) => {
+    if (err) {
+      res.writeHead(404);
+      res.end("Not found");
+      return;
+    }
+    const ext = path.extname(fullPath);
+    res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream" });
+    res.end(data);
+  });
+}
+
+async function handleEssay(req, res) {
+  let body;
+  try {
+    body = JSON.parse(await readBody(req));
+  } catch {
+    sendJson(res, 400, { error: "Invalid request body." });
+    return;
+  }
+
+  const apiKey = body.apiKey || process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    res.status(500).json({
-      error: "Server missing OPENAI_API_KEY. Copy .env.example to .env and add your key.",
+    sendJson(res, 400, {
+      error: "No API key. Add one in the field below, or create a .env file with OPENAI_API_KEY=sk-...",
     });
     return;
   }
 
-  const { prompt, length = "standard" } = req.body;
+  const { prompt, length = "standard" } = body;
   if (!prompt || prompt.trim().length < 10) {
-    res.status(400).json({ error: "Please provide a more detailed prompt." });
+    sendJson(res, 400, { error: "Please provide a more detailed prompt." });
     return;
   }
 
@@ -66,7 +133,7 @@ app.post("/api/essay", async (req, res) => {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: "gpt-4o-mini",
         stream: true,
         temperature: 0.7,
         messages: [
@@ -81,28 +148,33 @@ app.post("/api/essay", async (req, res) => {
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      res.status(response.status).json({
-        error: err.error?.message || "Failed to generate essay.",
+      sendJson(res, response.status, {
+        error: err.error?.message || `OpenAI error (${response.status})`,
       });
       return;
     }
 
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    });
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
+    let buffer = "";
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split("\n").filter((line) => line.startsWith("data: "));
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
 
       for (const line of lines) {
-        const data = line.slice(6);
+        if (!line.startsWith("data: ")) continue;
+        const data = line.slice(6).trim();
         if (data === "[DONE]") {
           res.write("data: [DONE]\n\n");
           continue;
@@ -114,7 +186,7 @@ app.post("/api/essay", async (req, res) => {
             res.write(`data: ${JSON.stringify({ content })}\n\n`);
           }
         } catch {
-          /* skip malformed chunks */
+          /* skip */
         }
       }
     }
@@ -122,10 +194,46 @@ app.post("/api/essay", async (req, res) => {
     res.end();
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error while generating essay." });
+    sendJson(res, 500, { error: "Server error. Is the server running and your API key valid?" });
   }
+}
+
+const server = http.createServer(async (req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  if (req.method === "GET" && req.url === "/api/health") {
+    sendJson(res, 200, {
+      ready: Boolean(process.env.OPENAI_API_KEY),
+      server: true,
+    });
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/api/essay") {
+    await handleEssay(req, res);
+    return;
+  }
+
+  if (req.method === "GET") {
+    serveStatic(req, res);
+    return;
+  }
+
+  res.writeHead(404);
+  res.end("Not found");
 });
 
-app.listen(PORT, () => {
-  console.log(`SynthWrite running at http://localhost:${PORT}`);
+server.listen(PORT, () => {
+  console.log(`\n  SynthWrite → http://localhost:${PORT}\n`);
+  if (!process.env.OPENAI_API_KEY) {
+    console.log("  Tip: Add your OpenAI key in the app, or put OPENAI_API_KEY in .env\n");
+  }
 });

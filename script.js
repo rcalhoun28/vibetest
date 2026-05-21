@@ -6,11 +6,13 @@ const LENGTH_LABELS = {
 };
 
 const MIN_PROMPT_LENGTH = 15;
+const API_KEY_STORAGE = "synthwrite_api_key";
 
 const inputScreen = document.getElementById("input-screen");
 const essayScreen = document.getElementById("essay-screen");
 const promptEl = document.getElementById("prompt");
 const lengthEl = document.getElementById("length");
+const apiKeyEl = document.getElementById("api-key");
 const inputError = document.getElementById("input-error");
 const generateBtn = document.getElementById("generate-btn");
 const essayOutput = document.getElementById("essay-output");
@@ -22,7 +24,14 @@ const newEssayBtn = document.getElementById("new-essay-btn");
 const setupNotice = document.getElementById("setup-notice");
 
 let essayText = "";
-let isStreaming = false;
+let serverOnline = false;
+
+const savedKey = sessionStorage.getItem(API_KEY_STORAGE);
+if (savedKey) apiKeyEl.value = savedKey;
+
+apiKeyEl.addEventListener("change", () => {
+  sessionStorage.setItem(API_KEY_STORAGE, apiKeyEl.value.trim());
+});
 
 function showScreen(screen) {
   [inputScreen, essayScreen].forEach((el) => {
@@ -42,9 +51,7 @@ function formatEssay(text) {
 
   if (paragraphs.length === 0) return "";
 
-  return paragraphs
-    .map((p) => `<p>${escapeHtml(p)}</p>`)
-    .join("");
+  return paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join("");
 }
 
 function renderEssay(streaming = false) {
@@ -81,11 +88,70 @@ function setLoading(on) {
   generateBtn.disabled = on;
 }
 
+function getApiKey() {
+  return apiKeyEl.value.trim();
+}
+
+async function parseErrorResponse(response) {
+  try {
+    const data = await response.json();
+    return data.error || `Request failed (${response.status})`;
+  } catch {
+    return `Request failed (${response.status})`;
+  }
+}
+
+async function consumeStream(reader) {
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const data = line.slice(6).trim();
+      if (data === "[DONE]") continue;
+
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed.content) {
+          essayText += parsed.content;
+          renderEssay(true);
+          updateWordCount();
+          essayOutput.scrollTop = essayOutput.scrollHeight;
+        }
+      } catch {
+        /* skip malformed chunk */
+      }
+    }
+  }
+}
+
 async function generateEssay() {
   const prompt = promptEl.value.trim();
   const length = lengthEl.value;
+  const apiKey = getApiKey();
 
   inputError.hidden = true;
+
+  if (!serverOnline) {
+    inputError.textContent =
+      "Server not running. Open Terminal, cd to this project folder, run: node server.mjs — then visit http://localhost:3000";
+    inputError.hidden = false;
+    return;
+  }
+
+  if (!apiKey && !setupNotice.dataset.envReady) {
+    inputError.textContent = "Please enter your OpenAI API key above.";
+    inputError.hidden = false;
+    return;
+  }
 
   if (prompt.length < MIN_PROMPT_LENGTH) {
     inputError.textContent = "Please enter a more detailed prompt (at least 15 characters).";
@@ -104,58 +170,38 @@ async function generateEssay() {
     const response = await fetch("/api/essay", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, length }),
+      body: JSON.stringify({ prompt, length, apiKey: apiKey || undefined }),
     });
 
     if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || "Failed to generate essay.");
+      throw new Error(await parseErrorResponse(response));
     }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
+    const contentType = response.headers.get("content-type") || "";
+
+    if (!contentType.includes("text/event-stream")) {
+      throw new Error("Unexpected response from server.");
+    }
+
     setLoading(false);
-    isStreaming = true;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split("\n");
-
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        const data = line.slice(6);
-        if (data === "[DONE]") continue;
-
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.content) {
-            essayText += parsed.content;
-            renderEssay(true);
-            updateWordCount();
-            essayOutput.scrollTop = essayOutput.scrollHeight;
-          }
-        } catch {
-          /* skip */
-        }
-      }
-    }
-
-    isStreaming = false;
+    await consumeStream(response.body.getReader());
 
     if (!essayText.trim()) {
-      throw new Error("No essay content received.");
+      throw new Error("No essay content received. Check your API key and try again.");
     }
 
     renderEssay(false);
     updateWordCount();
   } catch (err) {
     setLoading(false);
-    isStreaming = false;
     showScreen(inputScreen);
-    inputError.textContent = err.message;
+
+    if (err.message === "Failed to fetch") {
+      inputError.textContent =
+        "Cannot reach server. Run node server.mjs in Terminal, then open http://localhost:3000";
+    } else {
+      inputError.textContent = err.message;
+    }
     inputError.hidden = false;
   }
 }
@@ -180,12 +226,22 @@ newEssayBtn.addEventListener("click", () => {
 async function checkSetup() {
   try {
     const res = await fetch("/api/health");
-    const { ready } = await res.json();
-    setupNotice.hidden = ready;
-    generateBtn.disabled = !ready;
+    const data = await res.json();
+    serverOnline = true;
+    setupNotice.dataset.envReady = data.ready ? "1" : "";
+
+    if (data.ready) {
+      setupNotice.hidden = true;
+    } else {
+      setupNotice.hidden = false;
+      setupNotice.innerHTML =
+        "<strong>Server is running.</strong> Add your OpenAI API key above, or put <code>OPENAI_API_KEY=sk-...</code> in a <code>.env</code> file.";
+    }
   } catch {
+    serverOnline = false;
     setupNotice.hidden = false;
-    generateBtn.disabled = true;
+    setupNotice.innerHTML =
+      "<strong>Start the server:</strong> In Terminal, run <code>node server.mjs</code> from this folder, then open <code>http://localhost:3000</code> (do not open the HTML file directly).";
   }
 }
 

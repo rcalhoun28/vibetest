@@ -3,18 +3,58 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hello World</title>
+  <title>NoteQuiz</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <main class="card">
-    <p class="hint">Click anywhere to change language</p>
-    <h1 id="greeting">Hello, World!</h1>
-    <div class="country-map" id="country-map">
-      <img id="country-outline" src="countries/gb.svg" alt="United Kingdom outline" />
-    </div>
-    <p id="language" class="language">English</p>
-  </main>
+  <div class="app">
+    <header class="header">
+      <h1>NoteQuiz</h1>
+      <p class="tagline">Paste your notes, get a quiz instantly</p>
+    </header>
+
+    <section id="input-screen" class="screen active">
+      <label for="notes" class="label">Your notes</label>
+      <textarea
+        id="notes"
+        placeholder="Paste study notes here...
+
+Tips for better quizzes:
+• Use clear sentences and bullet points
+• Add definitions like Term: meaning
+• Include key facts you want to remember"
+        rows="12"
+      ></textarea>
+      <p id="input-error" class="error" hidden></p>
+      <button id="generate-btn" type="button" class="btn btn-primary">Generate Quiz</button>
+    </section>
+
+    <section id="quiz-screen" class="screen">
+      <div class="quiz-header">
+        <span id="progress">Question 1 of 5</span>
+        <span id="score-live" class="score-live"></span>
+      </div>
+      <div class="progress-bar">
+        <div id="progress-fill" class="progress-fill"></div>
+      </div>
+      <p id="question-text" class="question"></p>
+      <div id="options" class="options"></div>
+      <p id="feedback" class="feedback" hidden></p>
+      <button id="next-btn" type="button" class="btn btn-primary" hidden>Next Question</button>
+    </section>
+
+    <section id="results-screen" class="screen">
+      <div class="results-card">
+        <p class="results-label">Your score</p>
+        <p id="final-score" class="final-score">0 / 0</p>
+        <p id="results-message" class="results-message"></p>
+      </div>
+      <div class="results-actions">
+        <button id="retry-btn" type="button" class="btn btn-secondary">Retry Quiz</button>
+        <button id="new-notes-btn" type="button" class="btn btn-primary">New Notes</button>
+      </div>
+    </section>
+  </div>
   <script src="script.js"></script>
 </body>
 </html>

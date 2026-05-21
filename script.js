@@ -1,105 +1,347 @@
-const greetings = [
-  { text: "Hello, World!", language: "English", country: "gb", countryName: "United Kingdom" },
-  { text: "¡Hola, Mundo!", language: "Spanish", country: "es", countryName: "Spain" },
-  { text: "Bonjour, le monde !", language: "French", country: "fr", countryName: "France" },
-  { text: "Hallo, Welt!", language: "German", country: "de", countryName: "Germany" },
-  { text: "Ciao, mondo!", language: "Italian", country: "it", countryName: "Italy" },
-  { text: "Olá, Mundo!", language: "Portuguese", country: "pt", countryName: "Portugal" },
-  { text: "こんにちは、世界！", language: "Japanese", country: "jp", countryName: "Japan" },
-  { text: "안녕하세요, 세계!", language: "Korean", country: "kr", countryName: "South Korea" },
-  { text: "你好，世界！", language: "Chinese", country: "cn", countryName: "China" },
-  { text: "Привет, мир!", language: "Russian", country: "ru", countryName: "Russia" },
-  { text: "مرحبا بالعالم!", language: "Arabic", country: "sa", countryName: "Saudi Arabia" },
-  { text: "नमस्ते, दुनिया!", language: "Hindi", country: "in", countryName: "India" },
-  { text: "Hej, världen!", language: "Swedish", country: "se", countryName: "Sweden" },
-  { text: "Hallo, wereld!", language: "Dutch", country: "nl", countryName: "Netherlands" },
-  { text: "Witaj, świecie!", language: "Polish", country: "pl", countryName: "Poland" },
-  { text: "Merhaba, Dünya!", language: "Turkish", country: "tr", countryName: "Turkey" },
-  { text: "Γειά σου, κόσμε!", language: "Greek", country: "gr", countryName: "Greece" },
-  { text: "שלום, עולם!", language: "Hebrew", country: "il", countryName: "Israel" },
-  { text: "สวัสดี, โลก!", language: "Thai", country: "th", countryName: "Thailand" },
-  { text: "Xin chào, thế giới!", language: "Vietnamese", country: "vn", countryName: "Vietnam" },
-];
+const STOP_WORDS = new Set([
+  "about", "after", "also", "been", "before", "being", "between", "both",
+  "could", "each", "from", "have", "into", "just", "like", "more", "most",
+  "much", "only", "other", "over", "same", "some", "such", "than", "that",
+  "their", "them", "then", "there", "these", "they", "this", "those",
+  "through", "under", "very", "were", "what", "when", "where", "which",
+  "while", "with", "would", "your", "will", "shall", "should", "does",
+  "done", "make", "made", "many", "well", "even", "still", "because",
+]);
 
-let index = 0;
-let isSpinning = false;
+const MAX_QUESTIONS = 10;
+const MIN_NOTES_LENGTH = 80;
 
-const greetingEl = document.getElementById("greeting");
-const languageEl = document.getElementById("language");
-const countryMapEl = document.getElementById("country-map");
-const countryOutlineEl = document.getElementById("country-outline");
+let questions = [];
+let currentIndex = 0;
+let score = 0;
+let answered = false;
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+const inputScreen = document.getElementById("input-screen");
+const quizScreen = document.getElementById("quiz-screen");
+const resultsScreen = document.getElementById("results-screen");
+const notesEl = document.getElementById("notes");
+const inputError = document.getElementById("input-error");
+const generateBtn = document.getElementById("generate-btn");
+const progressEl = document.getElementById("progress");
+const progressFill = document.getElementById("progress-fill");
+const scoreLive = document.getElementById("score-live");
+const questionText = document.getElementById("question-text");
+const optionsEl = document.getElementById("options");
+const feedbackEl = document.getElementById("feedback");
+const nextBtn = document.getElementById("next-btn");
+const finalScoreEl = document.getElementById("final-score");
+const resultsMessage = document.getElementById("results-message");
+const retryBtn = document.getElementById("retry-btn");
+const newNotesBtn = document.getElementById("new-notes-btn");
 
-function randomIndex(exclude) {
-  let i;
-  do {
-    i = Math.floor(Math.random() * greetings.length);
-  } while (i === exclude && greetings.length > 1);
-  return i;
-}
-
-function applyItem(item, isFinal) {
-  greetingEl.textContent = item.text;
-  languageEl.textContent = item.language;
-  countryOutlineEl.src = `countries/${item.country}.svg`;
-  countryOutlineEl.alt = isFinal ? `${item.countryName} outline` : "";
-}
-
-function pulseTick() {
-  [countryOutlineEl, greetingEl, languageEl].forEach((el) => {
-    el.classList.remove("tick");
-    void el.offsetWidth;
-    el.classList.add("tick");
+function showScreen(screen) {
+  [inputScreen, quizScreen, resultsScreen].forEach((el) => {
+    el.classList.toggle("active", el === screen);
   });
 }
 
-async function spinWheel(targetIndex) {
-  const target = greetings[targetIndex];
-  const spinCount = 14 + Math.floor(Math.random() * 10);
+function shuffle(arr) {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
 
-  for (let i = 0; i < spinCount; i++) {
-    const isFinal = i === spinCount - 1;
-    const item = isFinal ? target : greetings[randomIndex(targetIndex)];
-    applyItem(item, isFinal);
-    pulseTick();
+function pickRandom(arr, exclude = []) {
+  const pool = arr.filter((item) => !exclude.includes(item));
+  if (pool.length === 0) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 
-    const progress = i / (spinCount - 1);
-    const delay = 35 + progress * progress * 280;
-    await sleep(delay);
+function extractKeywords(text) {
+  const words = text.match(/\b[A-Za-z]{4,}\b/g) || [];
+  return [...new Set(
+    words
+      .map((w) => w.toLowerCase())
+      .filter((w) => !STOP_WORDS.has(w))
+  )];
+}
+
+function parseNotes(text) {
+  const chunks = [];
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+
+  for (const line of lines) {
+    const bullet = line.match(/^[-*•]\s+(.+)$/);
+    const numbered = line.match(/^\d+[.)]\s+(.+)$/);
+    if (bullet || numbered) {
+      const content = (bullet || numbered)[1].trim();
+      if (content.length > 20) chunks.push({ type: "fact", text: content });
+      continue;
+    }
+
+    const definition = line.match(/^([^:–-]{2,60})[:–-]\s+(.+)$/);
+    if (definition) {
+      const term = definition[1].trim();
+      const meaning = definition[2].trim();
+      if (term.length >= 2 && meaning.length >= 15) {
+        chunks.push({ type: "definition", term, meaning });
+        continue;
+      }
+    }
+
+    const sentences = line.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 25);
+    for (const sentence of sentences) {
+      chunks.push({ type: "sentence", text: sentence.trim() });
+    }
+
+    if (sentences.length === 0 && line.length > 25) {
+      chunks.push({ type: "sentence", text: line });
+    }
+  }
+
+  return chunks;
+}
+
+function buildOptions(correct, pool, count = 4) {
+  const distractors = shuffle(
+    pool.filter((item) => item.toLowerCase() !== correct.toLowerCase())
+  ).slice(0, count - 1);
+
+  while (distractors.length < count - 1) {
+    distractors.push(`Option ${distractors.length + 1}`);
+  }
+
+  return shuffle([correct, ...distractors.slice(0, count - 1)]);
+}
+
+function questionFromDefinition(def, allDefinitions, allMeanings) {
+  const type = Math.random() < 0.5 ? "term" : "meaning";
+
+  if (type === "term") {
+    return {
+      prompt: `Which term is defined as: "${def.meaning}"?`,
+      answer: def.term,
+      options: buildOptions(
+        def.term,
+        allDefinitions.map((d) => d.term)
+      ),
+    };
+  }
+
+  return {
+    prompt: `What is the definition of "${def.term}"?`,
+    answer: def.meaning,
+    options: buildOptions(def.meaning, allMeanings),
+  };
+}
+
+function questionFromSentence(sentence, keywords) {
+  const words = sentence.match(/\b[A-Za-z]{5,}\b/g) || [];
+  const candidates = words.filter((w) => !STOP_WORDS.has(w.toLowerCase()));
+
+  if (candidates.length === 0) return null;
+
+  const answer = candidates.reduce((best, word) =>
+    (word.length > best.length ? word : best), candidates[0]);
+
+  const blanked = sentence.replace(
+    new RegExp(`\\b${answer}\\b`, "i"),
+    "______"
+  );
+
+  if (blanked === sentence) return null;
+
+  const distractorWords = keywords
+    .filter((k) => k !== answer.toLowerCase())
+    .map((k) => k.charAt(0).toUpperCase() + k.slice(1));
+
+  return {
+    prompt: `Fill in the blank:\n"${blanked}"`,
+    answer,
+    options: buildOptions(answer, distractorWords.length ? distractorWords : candidates),
+  };
+}
+
+function questionFromFact(fact, allFacts) {
+  const keywords = extractKeywords(fact);
+  if (keywords.length === 0) {
+    return {
+      prompt: `True or false: "${fact}"`,
+      answer: "True",
+      options: ["True", "False"],
+    };
+  }
+
+  const answerWord = keywords[Math.floor(Math.random() * keywords.length)];
+  const regex = new RegExp(`\\b${answerWord}\\b`, "i");
+  const blanked = fact.replace(regex, "______");
+
+  if (blanked === fact) {
+    return {
+      prompt: `Which statement appears in your notes?`,
+      answer: fact,
+      options: buildOptions(fact, allFacts.map((f) => f.text)),
+    };
+  }
+
+  return {
+    prompt: `Fill in the blank:\n"${blanked}"`,
+    answer: answerWord,
+    options: buildOptions(
+      answerWord.charAt(0).toUpperCase() + answerWord.slice(1),
+      keywords.map((k) => k.charAt(0).toUpperCase() + k.slice(1))
+    ),
+  };
+}
+
+function generateQuestions(notes) {
+  const chunks = parseNotes(notes);
+  const allKeywords = extractKeywords(notes);
+  const definitions = chunks.filter((c) => c.type === "definition");
+  const sentences = chunks.filter((c) => c.type === "sentence");
+  const facts = chunks.filter((c) => c.type === "fact");
+  const allMeanings = definitions.map((d) => d.meaning);
+
+  const built = [];
+
+  for (const def of shuffle(definitions)) {
+    built.push(
+      questionFromDefinition(def, definitions, allMeanings)
+    );
+  }
+
+  for (const sentence of shuffle(sentences)) {
+    const q = questionFromSentence(sentence.text, allKeywords);
+    if (q) built.push(q);
+  }
+
+  for (const fact of shuffle(facts)) {
+    built.push(questionFromFact(fact, facts));
+  }
+
+  const unique = [];
+  const seen = new Set();
+
+  for (const q of built) {
+    const key = q.prompt.slice(0, 60);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(q);
+  }
+
+  return shuffle(unique).slice(0, MAX_QUESTIONS);
+}
+
+function startQuiz() {
+  const notes = notesEl.value.trim();
+  inputError.hidden = true;
+
+  if (notes.length < MIN_NOTES_LENGTH) {
+    inputError.textContent = `Please paste at least ${MIN_NOTES_LENGTH} characters of notes.`;
+    inputError.hidden = false;
+    return;
+  }
+
+  questions = generateQuestions(notes);
+
+  if (questions.length < 3) {
+    inputError.textContent =
+      "Could not build enough questions. Add more sentences, bullet points, or Term: definition lines.";
+    inputError.hidden = false;
+    return;
+  }
+
+  currentIndex = 0;
+  score = 0;
+  showScreen(quizScreen);
+  renderQuestion();
+}
+
+function renderQuestion() {
+  answered = false;
+  const q = questions[currentIndex];
+  const total = questions.length;
+
+  progressEl.textContent = `Question ${currentIndex + 1} of ${total}`;
+  progressFill.style.width = `${((currentIndex) / total) * 100}%`;
+  scoreLive.textContent = `Score: ${score}`;
+  questionText.textContent = q.prompt;
+  feedbackEl.hidden = true;
+  nextBtn.hidden = true;
+
+  optionsEl.innerHTML = "";
+  q.options.forEach((option) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "option";
+    btn.textContent = option;
+    btn.addEventListener("click", () => selectAnswer(btn, option, q.answer));
+    optionsEl.appendChild(btn);
+  });
+}
+
+function selectAnswer(btn, selected, correct) {
+  if (answered) return;
+  answered = true;
+
+  const isCorrect =
+    selected.toLowerCase().trim() === correct.toLowerCase().trim();
+
+  if (isCorrect) score++;
+
+  optionsEl.querySelectorAll(".option").forEach((opt) => {
+    opt.disabled = true;
+    const text = opt.textContent;
+    if (text.toLowerCase().trim() === correct.toLowerCase().trim()) {
+      opt.classList.add("correct");
+    } else if (opt === btn && !isCorrect) {
+      opt.classList.add("wrong");
+    }
+  });
+
+  feedbackEl.hidden = false;
+  feedbackEl.className = `feedback ${isCorrect ? "correct" : "wrong"}`;
+  feedbackEl.textContent = isCorrect
+    ? "Correct!"
+    : `Not quite. The answer is: ${correct}`;
+  scoreLive.textContent = `Score: ${score}`;
+  nextBtn.hidden = false;
+  nextBtn.textContent =
+    currentIndex === questions.length - 1 ? "See Results" : "Next Question";
+}
+
+function showResults() {
+  const total = questions.length;
+  const pct = Math.round((score / total) * 100);
+
+  finalScoreEl.textContent = `${score} / ${total}`;
+  resultsMessage.textContent =
+    pct === 100
+      ? "Perfect score — you crushed it!"
+      : pct >= 70
+        ? "Solid work. Review the ones you missed."
+        : "Keep studying — run the quiz again!";
+
+  showScreen(resultsScreen);
+}
+
+function nextQuestion() {
+  if (currentIndex < questions.length - 1) {
+    currentIndex++;
+    renderQuestion();
+  } else {
+    progressFill.style.width = "100%";
+    showResults();
   }
 }
 
-async function showNext() {
-  if (isSpinning) return;
-  isSpinning = true;
-
-  const nextIndex = (index + 1) % greetings.length;
-
-  countryMapEl.classList.add("spinning");
-
-  await spinWheel(nextIndex);
-
-  index = nextIndex;
-  countryMapEl.classList.remove("spinning");
-  countryMapEl.classList.add("landed");
-  greetingEl.classList.add("landed");
-  languageEl.classList.add("landed");
-
-  await sleep(400);
-
-  countryMapEl.classList.remove("landed");
-  greetingEl.classList.remove("landed", "tick");
-  languageEl.classList.remove("landed", "tick");
-  countryOutlineEl.classList.remove("tick");
-  isSpinning = false;
-}
-
-greetings.forEach((g) => {
-  const img = new Image();
-  img.src = `countries/${g.country}.svg`;
+generateBtn.addEventListener("click", startQuiz);
+nextBtn.addEventListener("click", nextQuestion);
+retryBtn.addEventListener("click", () => {
+  currentIndex = 0;
+  score = 0;
+  questions = shuffle(questions);
+  showScreen(quizScreen);
+  renderQuestion();
 });
-
-document.body.addEventListener("click", showNext);
+newNotesBtn.addEventListener("click", () => {
+  showScreen(inputScreen);
+});

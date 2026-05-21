@@ -112,172 +112,168 @@ function wordCount(text) {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-function expandSentence(base, targetWords) {
+function makeTopicExtensions(topic, terms) {
+  const tp = topicPhrase(topic);
+  const list = terms.length ? terms : [topic];
+  const extensions = [];
+
+  list.forEach((term, i) => {
+    const other = list[(i + 1) % list.length];
+    extensions.push(
+      ` In the context of ${tp}, ${term} shapes how participants interpret ${other} and respond to institutional pressures.`,
+      ` Analysts of ${tp} increasingly treat ${term} not as a footnote but as a variable that reorganizes the entire problem space.`,
+      ` Concrete disputes over ${term} within ${tp} reveal where theory and practice diverge, and why synthesis must address both.`,
+    );
+  });
+
+  extensions.push(
+    ` Any serious treatment of ${tp} must therefore connect abstract claims to the mechanisms through which they materialize in policy and daily life.`,
+    ` The foregoing discussion of ${tp} suggests that single-discipline explanations routinely under-specify the relations they claim to describe.`,
+    ` Readers evaluating ${tp} should weigh not only descriptive accuracy but whether an account can absorb counterevidence without collapsing.`,
+    ` What distinguishes a synthetic approach to ${tp} is its capacity to relate competing explanations instead of ranking them prematurely.`,
+  );
+
+  return shuffle(extensions);
+}
+
+function expandSentence(base, targetWords, topic, terms, used) {
   let text = base;
-  const elaborations = shuffle([
-    ` Such dynamics are neither accidental nor merely contextual; they reflect deeper patterns of organization and meaning.`,
-    ` Scholars have long debated the mechanisms involved, yet the most persuasive accounts emphasize relational rather than isolated causation.`,
-    ` This is not to deny countervailing forces, but to insist that any adequate framework must hold competing explanations in productive tension.`,
-    ` Empirical cases illustrate the point: where interventions ignore structural constraints, reform remains partial at best.`,
-    ` The implications extend beyond immediate settings, bearing on how institutions allocate legitimacy and resources.`,
-    ` Read against alternative paradigms, the same evidence supports a more nuanced, dialectical interpretation.`,
-    ` Attention to marginal cases often reveals assumptions embedded in dominant theories that otherwise pass unnoticed.`,
-    ` The cumulative weight of evidence suggests a reframing rather than a minor revision of conventional wisdom.`,
-  ]);
+  const pool = makeTopicExtensions(topic, terms).filter((s) => !used.has(s));
   let i = 0;
-  while (wordCount(text) < targetWords && i < elaborations.length) {
-    text += elaborations[i++];
+  while (wordCount(text) < targetWords && i < pool.length) {
+    used.add(pool[i]);
+    text += pool[i];
+    i++;
   }
   return text;
 }
 
-function bodyParagraph(topic, terms, lens, index) {
-  const term = terms[index % terms.length] || "core concepts";
+function bodyParagraph(topic, terms, lens, index, used, targetWords) {
+  const term = terms[index % terms.length] || topic;
   const term2 = terms[(index + 1) % terms.length] || term;
+  const term3 = terms[(index + 2) % terms.length] || term2;
   const otherLens = pick(LENSES.filter((l) => l !== lens));
-  const syn = pick(SYNTHESIS);
-  const trans = pick(TRANSITIONS);
+  const syn = SYNTHESIS[index % SYNTHESIS.length];
+  const trans = TRANSITIONS[index % TRANSITIONS.length];
 
   const variants = [
-    `${trans}, an examination of ${lens} clarifies how ${term} mediates our understanding of ${topicPhrase(topic)}. ${syn} ${otherLens}, material and symbolic dimensions co-produce outcomes that neither alone can explain. The paragraph thus advances a relational account in which ${term2} remains central rather than ornamental.`,
-    `From the vantage of ${lens}, ${term} emerges as structurally constitutive of debates surrounding ${topic}. Rather than treating ${term2} as background context, this section positions it as an active variable. ${syn} dominant narratives, multi-causal explanation displaces stories that privilege a single lever of change.`,
-    `${capitalize(lens)} reframes familiar disputes about ${topic}: ${term} reconfigures what counts as evidence and what counts as consequence. ${trans}, linking ${term2} to wider patterns avoids the trap of anecdotal particularism. Critics who demand simpler models overlook how complexity itself is often the phenomenon to be explained.`,
-    `If ${lens} is taken seriously, ${term} cannot be bracketed when assessing ${topicPhrase(topic)}. ${syn} inquiries into ${otherLens}, the analysis shows reciprocal determination between structure and practice. This reciprocity is precisely what synthetic scholarship must make visible for ${term2} and related concepts.`,
+    `${trans}, an examination of ${lens} clarifies how ${term} mediates our understanding of ${topicPhrase(topic)}. ${syn} ${otherLens}, material and symbolic dimensions co-produce outcomes that neither alone can explain. Here ${term2} and ${term3} are not peripheral details but coordinates for interpreting why ${topic} remains contested.`,
+    `From the vantage of ${lens}, ${term} emerges as structurally constitutive of debates surrounding ${topic}. Rather than treating ${term2} as background context, this section positions it as an active variable within ${topicPhrase(topic)}. ${syn} dominant narratives about ${term3}, multi-causal explanation displaces accounts that privilege a single lever of change.`,
+    `${capitalize(lens)} reframes disputes about ${topic}: ${term} reconfigures what counts as evidence and what counts as consequence. ${trans}, linking ${term2} to wider patterns in ${topicPhrase(topic)} avoids anecdotal particularism. The dispute over ${term3} exemplifies why reductionist models fail for this topic.`,
+    `If ${lens} is taken seriously, ${term} cannot be bracketed when assessing ${topicPhrase(topic)}. ${syn} inquiries into ${otherLens}, the analysis shows reciprocal determination between structure and practice as they bear on ${term2}. For ${topic}, making ${term3} visible is part of the synthetic task this essay undertakes.`,
+    `Section ${index + 1} foregrounds ${lens} as a lens on ${topicPhrase(topic)}, arguing that ${term} alters how ${term2} is classified, measured, and acted upon. Without integrating ${term3}, reform efforts addressing ${topic} repeat familiar failures. ${trans}, the section links micro-level choices to macro-level patterns.`,
   ];
 
-  return expandSentence(pick(variants), 115 + index * 12);
+  return expandSentence(variants[index % variants.length], targetWords, topic, terms, used);
 }
 
-function buildConclusion(topic, terms) {
-  const t = terms[0] || "the subject";
+function buildConclusion(topic, terms, used) {
+  const t = terms[0] || topic;
+  const t2 = terms[1] || t;
   const variants = [
-    `In conclusion, ${topicPhrase(topic)} rewards interdisciplinary synthesis rather than narrow specialization. Perspectives on ${terms.slice(0, 3).join(", ") || t} converge on a critical yet constructive stance. Future inquiry should test this integrative model across contexts while remaining alert to power, history, and lived experience.`,
-    `To conclude, the essay has argued that ${topicPhrase(topic)} is best approached through layered analysis rather than single-factor explanation. Themes of ${terms.slice(0, 2).join(" and ") || t} thread through each section, demonstrating deep synthesis. What remains is to carry this framework into research, teaching, and public debate with equal rigor.`,
-    `Ultimately, understanding ${topicPhrase(topic)} requires holding ${t} and related concepts in deliberate tension. The preceding sections have mapped that tension without resolving it prematurely. Such restraint is a strength: it invites continued scholarship and more democratic deliberation about consequences that follow from how we define the problem.`,
+    `In conclusion, ${topicPhrase(topic)} rewards interdisciplinary synthesis rather than narrow specialization. Perspectives on ${terms.slice(0, 3).join(", ") || t} converge on a critical yet constructive reading of ${topic}. The analysis of ${t2} in particular shows why future inquiry must remain comparative, historical, and attentive to power.`,
+    `To conclude, this essay has argued that ${topicPhrase(topic)} is best approached through layered analysis rather than single-factor explanation. Themes of ${terms.slice(0, 2).join(" and ") || t} thread through each section on ${topic}, demonstrating deep synthesis rather than summary. The task ahead is to test these claims against new cases while refining how ${t2} is theorized.`,
+    `Ultimately, understanding ${topicPhrase(topic)} requires holding ${t} and ${t2} in deliberate tension. The preceding sections mapped that tension within ${topic} without resolving it prematurely. Such restraint strengthens the argument: it invites continued scholarship and more informed public deliberation about ${topic}.`,
   ];
-  return expandSentence(pick(variants), 95);
+  return expandSentence(pick(variants), 100, topic, terms, used);
 }
 
-function buildIntroduction(topic, thesis) {
+function buildIntroduction(topic, thesis, used) {
+  const lead = termsFromTopic(topic);
   return expandSentence(
-    `${capitalize(topicPhrase(topic))} occupies a central place in contemporary scholarship, yet accounts often talk past one another. ` +
-      `Some emphasize structural determination; others privilege agency, discourse, or technological change. ` +
-      `What unites these divergent approaches is a shared recognition that the issue resists easy resolution. ` +
+    `${capitalize(topicPhrase(topic))} occupies a central place in contemporary scholarship, yet accounts of ${topic} often talk past one another. ` +
+      `Some emphasize ${lead[0] || "structure"}; others foreground ${lead[1] || "agency"} or ${lead[2] || "discourse"}. ` +
+      `What unites these divergent approaches is a shared recognition that ${topic} resists easy resolution. ` +
       `${thesis}`,
-    110
+    115,
+    topic,
+    lead,
+    used
   );
 }
 
-function buildCounterargumentParagraph(topic, terms) {
-  const term = pick(terms);
-  return expandSentence(
-    `A substantive objection holds that analyses of ${topicPhrase(topic)} exaggerate the salience of ${term} at the expense of ordinary experience. ` +
-      `Proponents of this view argue that everyday practice often diverges from theoretical models, and that policy should therefore heed local knowledge. ` +
-      `While this critique deserves serious engagement, it risks conflating descriptive variation with evidence against structural explanation. ` +
-      `Reconciling these positions requires distinguishing between how phenomena appear in particular settings and the underlying relations that persist across them.`,
-    95
-  );
+function termsFromTopic(topic) {
+  return extractTerms(topic).length ? extractTerms(topic) : topic.split(/\s+/).filter((w) => w.length > 3);
 }
 
-function buildImplicationsParagraph(topic, terms) {
-  const t1 = terms[0] || "the topic";
-  const t2 = terms[1] || "related forces";
-  return expandSentence(
-    `The practical implications of this argument extend to how educators, policymakers, and citizens deliberate about ${t1} and ${t2}. ` +
-      `If synthesis rather than fragmentation guides inquiry, curricula and public forums can foreground tensions instead of false consensus. ` +
-      `Institutional redesign—whether in law, media, or administration—must therefore be evaluated by whether it enables contested ideas to inform collective judgment without collapsing into relativism.`,
-    95
-  );
+function buildSupplement(topic, terms, sectionIndex, used) {
+  const t0 = terms[sectionIndex % terms.length] || topic;
+  const t1 = terms[(sectionIndex + 1) % terms.length] || t0;
+  const t2 = terms[(sectionIndex + 2) % terms.length] || t1;
+  const tp = topicPhrase(topic);
+
+  const sections = [
+    `A substantive objection to prevailing views of ${tp} holds that they exaggerate ${t0} at the expense of lived experience with ${topic}. Advocates of this critique insist that communities encounter ${t1} in ways theory often misses. Engaging ${topic} fairly requires answering whether ${t2} still matters once local variation is taken seriously.`,
+    `The practical implications for ${topic} follow directly: decisions about ${t0} and ${t1} shape who benefits and who bears risk within ${tp}. Policymakers addressing ${topic} cannot treat ${t2} as merely technical when it encodes values and distributes authority.`,
+    `Historically, ${tp} has been framed through shifting vocabularies of ${t0}, ${t1}, and moral obligation. Earlier eras approached ${topic} differently than contemporary analysts, yet persistent patterns linking ${t2} to institutional power remain. Genealogical awareness clarifies what is novel about present conflicts over ${topic}.`,
+    `Comparative inquiry into ${topic} shows that ${t0} under ${t1} does not operate uniformly across regions. ${capitalize(tp)} appears differently when ${t2} is embedded in distinct legal, economic, and cultural systems. Comparative breadth prevents claims about ${topic} from collapsing into parochial generalization.`,
+    `Methodologically, this essay interprets ${topic} by relating concepts rather than cataloguing facts alone. The focus on ${t0}, ${t1}, and ${t2} within ${tp} is deliberate: it tests whether an integrative framework improves explanatory clarity for ${topic} specifically.`,
+    `Communities and professionals engaged with ${topic} experience ${t0} and ${t1} in uneven ways. Centering ${t2} within ${tp} makes visible harms and possibilities that detached models overlook. Synthetic analysis of ${topic} therefore carries normative as well as descriptive weight.`,
+  ];
+
+  const base = sections[sectionIndex % sections.length];
+  return expandSentence(base, 110, topic, terms, used);
 }
 
-function buildHistoricalParagraph(topic, terms) {
-  const term = pick(terms);
-  return expandSentence(
-    `Historically, debates over ${topicPhrase(topic)} have shifted as ${term} acquired new meanings across periods and geographies. ` +
-      `Earlier generations often framed the issue in moral or theological vocabularies; contemporary discourse favors systemic and technical idioms. ` +
-      `Tracing this genealogy does not dissolve present disagreements but clarifies why certain assumptions now feel inevitable. ` +
-      `Historical consciousness thus becomes a tool of synthesis, linking past transformations to present stakes.`,
-    95
-  );
-}
+const BODY_CONFIG = {
+  brief: { count: 3, words: 95 },
+  standard: { count: 4, words: 120 },
+  extended: { count: 6, words: 135 },
+  comprehensive: { count: 10, words: 150 },
+};
 
-function buildComparativeParagraph(topic, terms) {
-  const term = pick(terms);
-  const region = pick(["European", "Global South", "transnational", "postcolonial", "comparative national"]);
-  return expandSentence(
-    `${capitalize(region)} perspectives on ${topicPhrase(topic)} challenge universal claims by showing how ${term} operates differently under varied institutional regimes. ` +
-      `What counts as evidence, authority, or progress in one context may not translate cleanly to another. ` +
-      `Rather than abandoning general theory, comparative work refines it by specifying scope conditions and mechanisms. ` +
-      `This move strengthens the essay's central thesis: synthesis demands geographic and cultural breadth, not provincial abstraction.`,
-    95
-  );
-}
-
-function buildMethodParagraph(topic) {
-  return expandSentence(
-    `Methodologically, the essay adopts an interpretive yet critical stance toward ${topicPhrase(topic)}. ` +
-      `It does not claim exhaustive empirical coverage; instead, it evaluates how concepts cohere, conflict, and illuminate one another. ` +
-      `Such an approach aligns with humanistic and social-scientific traditions that treat understanding as iterative and revisable. ` +
-      `Readers should therefore assess the argument by its explanatory power and internal consistency as much as by discrete factual claims.`,
-    90
-  );
-}
-
-function buildStakeholdersParagraph(topic, terms) {
-  const term = pick(terms);
-  return expandSentence(
-    `Stakeholders affected by ${topicPhrase(topic)}—including communities, professionals, and advocacy groups—experience ${term} in materially different ways. ` +
-      `Analytic frameworks that ignore lived consequence risk legitimizing harm while appearing neutral. ` +
-      `Integrating stakeholder insight with structural analysis prevents both romantic particularism and detached abstraction. ` +
-      `This integrative move exemplifies the deep synthesis the essay pursues throughout.`,
-    90
-  );
-}
-
-const SUPPLEMENT_PARAGRAPHS = [
-  buildCounterargumentParagraph,
-  buildImplicationsParagraph,
-  buildHistoricalParagraph,
-  buildComparativeParagraph,
-  buildMethodParagraph,
-  buildStakeholdersParagraph,
-];
-
-function padToTarget(paragraphs, topic, terms, target) {
-  let total = wordCount(paragraphs.join(" "));
-  const shuffledSupplements = shuffle(SUPPLEMENT_PARAGRAPHS);
-  let i = 0;
-
-  while (total < target * 0.95 && i < shuffledSupplements.length) {
-    const extra = shuffledSupplements[i](topic, terms);
-    paragraphs.splice(paragraphs.length - 1, 0, extra);
-    total = wordCount(paragraphs.join(" "));
-    i++;
-  }
-
-  return paragraphs;
-}
+const SUPPLEMENT_COUNT = {
+  brief: 0,
+  standard: 0,
+  extended: 2,
+  comprehensive: 4,
+};
 
 function generateEssay(prompt, lengthKey = "standard") {
   const topic = cleanTopic(prompt);
-  const terms = extractTerms(prompt);
+  let terms = extractTerms(prompt);
+  if (!terms.length) {
+    terms = topic.split(/\s+/).filter((w) => w.length > 3).map((w) => w.toLowerCase());
+  }
+  if (!terms.length) terms = [topic];
+
   const target = LENGTH_TARGETS[lengthKey] || LENGTH_TARGETS.standard;
+  const used = new Set();
   const thesis = buildThesis(topic, terms);
+  const config = BODY_CONFIG[lengthKey] || BODY_CONFIG.standard;
 
-  const bodyCount =
-    lengthKey === "brief" ? 3 : lengthKey === "standard" ? 4 : lengthKey === "extended" ? 5 : 6;
+  const lenses = shuffle([...LENSES]);
+  const paragraphs = [buildIntroduction(topic, thesis, used)];
 
-  const lenses = pickN(LENSES, bodyCount);
-  const paragraphs = [buildIntroduction(topic, thesis)];
+  for (let i = 0; i < config.count; i++) {
+    paragraphs.push(
+      bodyParagraph(topic, terms, lenses[i % lenses.length], i, used, config.words)
+    );
+  }
 
-  lenses.forEach((lens, i) => {
-    paragraphs.push(bodyParagraph(topic, terms, lens, i));
-  });
+  const supplementTotal = SUPPLEMENT_COUNT[lengthKey] || 0;
+  const supplementOrder = shuffle([0, 1, 2, 3, 4, 5]);
+  for (let s = 0; s < supplementTotal; s++) {
+    paragraphs.push(buildSupplement(topic, terms, supplementOrder[s], used));
+  }
 
-  paragraphs.push(buildConclusion(topic, terms));
+  let extraBodyIndex = config.count;
+  while (wordCount(paragraphs.join(" ")) < target * 0.92 && extraBodyIndex < config.count + 4) {
+    paragraphs.push(
+      bodyParagraph(
+        topic,
+        terms,
+        lenses[extraBodyIndex % lenses.length],
+        extraBodyIndex,
+        used,
+        config.words
+      )
+    );
+    extraBodyIndex++;
+  }
 
-  const padded = padToTarget(paragraphs, topic, terms, target);
-  return padded.join("\n\n");
+  paragraphs.push(buildConclusion(topic, terms, used));
+  return paragraphs.join("\n\n");
 }
 
 const LENGTH_LABELS = {

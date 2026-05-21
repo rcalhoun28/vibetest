@@ -19,8 +19,10 @@ const wordCountEl = document.getElementById("word-count");
 const loadingEl = document.getElementById("loading");
 const copyBtn = document.getElementById("copy-btn");
 const newEssayBtn = document.getElementById("new-essay-btn");
+const setupNotice = document.getElementById("setup-notice");
 
 let essayText = "";
+let isStreaming = false;
 
 function showScreen(screen) {
   [inputScreen, essayScreen].forEach((el) => {
@@ -33,12 +35,31 @@ function countWords(text) {
 }
 
 function formatEssay(text) {
-  return text
-    .split(/\n\n+/)
+  const paragraphs = text
+    .split(/\n+/)
     .map((p) => p.trim())
-    .filter(Boolean)
+    .filter(Boolean);
+
+  if (paragraphs.length === 0) return "";
+
+  return paragraphs
     .map((p) => `<p>${escapeHtml(p)}</p>`)
     .join("");
+}
+
+function renderEssay(streaming = false) {
+  if (!essayText.trim()) {
+    essayOutput.innerHTML = "";
+    return;
+  }
+
+  if (streaming) {
+    essayOutput.classList.add("streaming");
+    essayOutput.innerHTML = `<p class="streaming-p">${escapeHtml(essayText)}</p>`;
+  } else {
+    essayOutput.classList.remove("streaming");
+    essayOutput.innerHTML = formatEssay(essayText);
+  }
 }
 
 function escapeHtml(str) {
@@ -94,6 +115,7 @@ async function generateEssay() {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     setLoading(false);
+    isStreaming = true;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -111,7 +133,7 @@ async function generateEssay() {
           const parsed = JSON.parse(data);
           if (parsed.content) {
             essayText += parsed.content;
-            essayOutput.innerHTML = formatEssay(essayText);
+            renderEssay(true);
             updateWordCount();
             essayOutput.scrollTop = essayOutput.scrollHeight;
           }
@@ -121,14 +143,17 @@ async function generateEssay() {
       }
     }
 
+    isStreaming = false;
+
     if (!essayText.trim()) {
       throw new Error("No essay content received.");
     }
 
-    essayOutput.innerHTML = formatEssay(essayText);
+    renderEssay(false);
     updateWordCount();
   } catch (err) {
     setLoading(false);
+    isStreaming = false;
     showScreen(inputScreen);
     inputError.textContent = err.message;
     inputError.hidden = false;
@@ -151,3 +176,17 @@ copyBtn.addEventListener("click", async () => {
 newEssayBtn.addEventListener("click", () => {
   showScreen(inputScreen);
 });
+
+async function checkSetup() {
+  try {
+    const res = await fetch("/api/health");
+    const { ready } = await res.json();
+    setupNotice.hidden = ready;
+    generateBtn.disabled = !ready;
+  } catch {
+    setupNotice.hidden = false;
+    generateBtn.disabled = true;
+  }
+}
+
+checkSetup();

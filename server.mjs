@@ -1,7 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import { fileURLToPath } from "url";
-import { dirname, join } from "path";
+import { dirname } from "path";
 
 dotenv.config();
 
@@ -36,6 +36,10 @@ The essay must read as original scholarly writing suitable for an upper-division
 
 app.use(express.json());
 app.use(express.static(__dirname));
+
+app.get("/api/health", (_req, res) => {
+  res.json({ ready: Boolean(process.env.OPENAI_API_KEY) });
+});
 
 app.post("/api/essay", async (req, res) => {
   const apiKey = process.env.OPENAI_API_KEY;

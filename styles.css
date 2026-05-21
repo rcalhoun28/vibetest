@@ -239,6 +239,29 @@ body {
   pointer-events: none;
 }
 
+.setup-notice {
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  background: rgba(212, 168, 83, 0.1);
+  border: 1px solid rgba(212, 168, 83, 0.3);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.setup-notice strong {
+  color: var(--gold);
+}
+
+.setup-notice code {
+  font-size: 0.8rem;
+  color: var(--accent);
+  background: var(--bg-elevated);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
 .error {
   color: var(--wrong);
   font-size: 0.85rem;
@@ -395,7 +418,16 @@ body {
   margin-bottom: 0;
 }
 
-.essay-output p:first-child::first-letter {
+.essay-output.streaming .streaming-p {
+  font-family: var(--font-serif);
+  font-size: 1.125rem;
+  line-height: 1.75;
+  color: rgba(240, 242, 246, 0.92);
+  text-align: justify;
+  white-space: pre-wrap;
+}
+
+.essay-output:not(.streaming) p:first-child::first-letter {
   font-size: 3.2em;
   float: left;
   line-height: 0.85;

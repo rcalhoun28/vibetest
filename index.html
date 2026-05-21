@@ -4,50 +4,101 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NoteQuiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <div class="bg-grid" aria-hidden="true"></div>
+
   <div class="app">
     <header class="header">
-      <h1>NoteQuiz</h1>
-      <p class="tagline">Paste your notes, get a quiz instantly</p>
+      <div class="logo">
+        <span class="logo-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 6.5v11M8 8.5h8M8 15.5h5"/>
+            <rect x="4" y="3" width="16" height="18" rx="2"/>
+          </svg>
+        </span>
+        <div>
+          <h1>NoteQuiz</h1>
+          <p class="tagline">Intelligent recall from your notes</p>
+        </div>
+      </div>
     </header>
 
     <section id="input-screen" class="screen active">
-      <label for="notes" class="label">Your notes</label>
-      <textarea
-        id="notes"
-        placeholder="Paste study notes here...
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-badge">Step 1</span>
+          <h2 class="panel-title">Import your material</h2>
+          <p class="panel-desc">Paste lecture notes, summaries, or definitions. We'll extract questions automatically.</p>
+        </div>
+        <label for="notes" class="label">Study notes</label>
+        <textarea
+          id="notes"
+          placeholder="Paste your notes here…
 
-Tips for better quizzes:
-• Use clear sentences and bullet points
-• Add definitions like Term: meaning
-• Include key facts you want to remember"
-        rows="12"
-      ></textarea>
-      <p id="input-error" class="error" hidden></p>
-      <button id="generate-btn" type="button" class="btn btn-primary">Generate Quiz</button>
+• Write clear, complete sentences
+• Use Term: definition for key concepts
+• Bullet points work well for facts"
+          rows="11"
+        ></textarea>
+        <p id="input-error" class="error" hidden></p>
+        <button id="generate-btn" type="button" class="btn btn-primary">
+          <span>Generate Quiz</span>
+          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+        </button>
+      </div>
     </section>
 
     <section id="quiz-screen" class="screen">
-      <div class="quiz-header">
-        <span id="progress">Question 1 of 5</span>
-        <span id="score-live" class="score-live"></span>
+      <div class="quiz-meta">
+        <div class="quiz-meta-left">
+          <span id="progress" class="progress-text">Question 1 of 5</span>
+          <div class="progress-bar">
+            <div id="progress-fill" class="progress-fill"></div>
+          </div>
+        </div>
+        <div class="score-pill">
+          <span class="score-pill-label">Score</span>
+          <span id="score-live" class="score-pill-value">0</span>
+        </div>
       </div>
-      <div class="progress-bar">
-        <div id="progress-fill" class="progress-fill"></div>
+
+      <div class="question-card">
+        <span class="question-label">Question</span>
+        <p id="question-text" class="question"></p>
       </div>
-      <p id="question-text" class="question"></p>
+
       <div id="options" class="options"></div>
-      <p id="feedback" class="feedback" hidden></p>
-      <button id="next-btn" type="button" class="btn btn-primary" hidden>Next Question</button>
+
+      <div id="feedback" class="feedback" hidden>
+        <span class="feedback-icon" aria-hidden="true"></span>
+        <span class="feedback-text"></span>
+      </div>
+
+      <button id="next-btn" type="button" class="btn btn-primary" hidden>
+        <span class="next-btn-label">Next Question</span>
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+      </button>
     </section>
 
     <section id="results-screen" class="screen">
       <div class="results-card">
-        <p class="results-label">Your score</p>
-        <p id="final-score" class="final-score">0 / 0</p>
+        <div class="score-ring" id="score-ring">
+          <svg viewBox="0 0 120 120">
+            <circle class="score-ring-bg" cx="60" cy="60" r="52"/>
+            <circle class="score-ring-fill" id="score-ring-fill" cx="60" cy="60" r="52"/>
+          </svg>
+          <div class="score-ring-inner">
+            <p id="final-score" class="final-score">0%</p>
+          </div>
+        </div>
+        <p class="results-label">Session complete</p>
         <p id="results-message" class="results-message"></p>
+        <p id="results-detail" class="results-detail"></p>
       </div>
       <div class="results-actions">
         <button id="retry-btn" type="button" class="btn btn-secondary">Retry Quiz</button>

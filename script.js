@@ -31,8 +31,13 @@ const feedbackEl = document.getElementById("feedback");
 const nextBtn = document.getElementById("next-btn");
 const finalScoreEl = document.getElementById("final-score");
 const resultsMessage = document.getElementById("results-message");
+const resultsDetail = document.getElementById("results-detail");
+const scoreRingFill = document.getElementById("score-ring-fill");
 const retryBtn = document.getElementById("retry-btn");
 const newNotesBtn = document.getElementById("new-notes-btn");
+
+const OPTION_LETTERS = "ABCDEFGHIJ";
+const RING_CIRCUMFERENCE = 327;
 
 function showScreen(screen) {
   [inputScreen, quizScreen, resultsScreen].forEach((el) => {
@@ -261,18 +266,22 @@ function renderQuestion() {
   const total = questions.length;
 
   progressEl.textContent = `Question ${currentIndex + 1} of ${total}`;
-  progressFill.style.width = `${((currentIndex) / total) * 100}%`;
-  scoreLive.textContent = `Score: ${score}`;
+  progressFill.style.width = `${(currentIndex / total) * 100}%`;
+  scoreLive.textContent = score;
   questionText.textContent = q.prompt;
   feedbackEl.hidden = true;
   nextBtn.hidden = true;
 
   optionsEl.innerHTML = "";
-  q.options.forEach((option) => {
+  q.options.forEach((option, i) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "option";
-    btn.textContent = option;
+    btn.innerHTML = `
+      <span class="option-letter">${OPTION_LETTERS[i]}</span>
+      <span class="option-text"></span>
+    `;
+    btn.querySelector(".option-text").textContent = option;
     btn.addEventListener("click", () => selectAnswer(btn, option, q.answer));
     optionsEl.appendChild(btn);
   });
@@ -289,7 +298,7 @@ function selectAnswer(btn, selected, correct) {
 
   optionsEl.querySelectorAll(".option").forEach((opt) => {
     opt.disabled = true;
-    const text = opt.textContent;
+    const text = opt.querySelector(".option-text").textContent;
     if (text.toLowerCase().trim() === correct.toLowerCase().trim()) {
       opt.classList.add("correct");
     } else if (opt === btn && !isCorrect) {
@@ -299,28 +308,35 @@ function selectAnswer(btn, selected, correct) {
 
   feedbackEl.hidden = false;
   feedbackEl.className = `feedback ${isCorrect ? "correct" : "wrong"}`;
-  feedbackEl.textContent = isCorrect
-    ? "Correct!"
-    : `Not quite. The answer is: ${correct}`;
-  scoreLive.textContent = `Score: ${score}`;
+  feedbackEl.querySelector(".feedback-text").textContent = isCorrect
+    ? "Correct — well recalled."
+    : `The answer is: ${correct}`;
+  scoreLive.textContent = score;
   nextBtn.hidden = false;
-  nextBtn.textContent =
-    currentIndex === questions.length - 1 ? "See Results" : "Next Question";
+  nextBtn.querySelector(".next-btn-label").textContent =
+    currentIndex === questions.length - 1 ? "View Results" : "Next Question";
 }
 
 function showResults() {
   const total = questions.length;
   const pct = Math.round((score / total) * 100);
 
-  finalScoreEl.textContent = `${score} / ${total}`;
+  finalScoreEl.textContent = `${pct}%`;
+  resultsDetail.textContent = `${score} of ${total} correct`;
   resultsMessage.textContent =
     pct === 100
-      ? "Perfect score — you crushed it!"
+      ? "Flawless recall"
       : pct >= 70
-        ? "Solid work. Review the ones you missed."
-        : "Keep studying — run the quiz again!";
+        ? "Strong performance"
+        : "Room to improve";
 
+  scoreRingFill.style.strokeDashoffset = RING_CIRCUMFERENCE;
   showScreen(resultsScreen);
+
+  requestAnimationFrame(() => {
+    scoreRingFill.style.strokeDashoffset =
+      RING_CIRCUMFERENCE - (pct / 100) * RING_CIRCUMFERENCE;
+  });
 }
 
 function nextQuestion() {
@@ -339,6 +355,7 @@ retryBtn.addEventListener("click", () => {
   currentIndex = 0;
   score = 0;
   questions = shuffle(questions);
+  scoreRingFill.style.strokeDashoffset = RING_CIRCUMFERENCE;
   showScreen(quizScreen);
   renderQuestion();
 });

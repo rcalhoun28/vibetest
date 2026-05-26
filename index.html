@@ -60,35 +60,45 @@
       <div id="lesson-list" class="lesson-list"></div>
     </section>
 
-    <!-- Lesson -->
+    <!-- Lesson (multi-step intro before quiz) -->
     <section id="screen-lesson" class="screen">
+      <div class="lesson-step-nav">
+        <span id="lesson-step-label" class="lesson-step-label">Step 1 of 5</span>
+        <div id="lesson-step-dots" class="step-dots"></div>
+      </div>
       <div class="lesson-badge" id="lesson-number"></div>
       <h2 id="lesson-title" class="section-title"></h2>
-      <p id="lesson-grammar" class="grammar-box"></p>
-      <h3 class="block-heading">Vocabulary</h3>
-      <div id="vocab-list" class="vocab-list"></div>
-      <h3 class="block-heading">Phrases</h3>
-      <div id="phrase-list" class="phrase-list"></div>
-      <button id="start-quiz-btn" type="button" class="btn btn-primary">Take the quiz</button>
+      <div id="lesson-step-content" class="lesson-step-content"></div>
+      <div class="lesson-nav-buttons">
+        <button id="lesson-prev" type="button" class="btn btn-secondary" hidden>Previous</button>
+        <button id="lesson-next" type="button" class="btn btn-primary">Next</button>
+      </div>
     </section>
 
     <!-- Quiz -->
     <section id="screen-quiz" class="screen">
+      <div class="quiz-header-banner">
+        <span class="quiz-banner-label">Quiz</span>
+        <span id="quiz-lesson-name" class="quiz-banner-title"></span>
+      </div>
       <div class="quiz-meta">
-        <span id="quiz-progress">Question 1 of 5</span>
+        <span id="quiz-progress">Question 1 of 8</span>
         <span id="quiz-score" class="quiz-score-live">0 correct</span>
       </div>
       <div class="progress-bar">
         <div id="quiz-progress-fill" class="progress-fill"></div>
       </div>
       <div class="question-card">
+        <p class="question-label">Question</p>
         <p id="quiz-question" class="quiz-question"></p>
+        <p id="quiz-hint" class="quiz-hint" hidden></p>
+        <p id="quiz-prompt-type" class="quiz-prompt-type"></p>
         <div id="quiz-options" class="quiz-options"></div>
         <input id="quiz-input" class="quiz-input" type="text" hidden placeholder="Type your answer…" autocomplete="off" />
         <button id="quiz-submit" type="button" class="btn btn-secondary" hidden>Check answer</button>
       </div>
       <p id="quiz-feedback" class="quiz-feedback" hidden></p>
-      <button id="quiz-next" type="button" class="btn btn-primary" hidden>Next</button>
+      <button id="quiz-next" type="button" class="btn btn-primary" hidden>Next question</button>
     </section>
 
     <!-- Results -->

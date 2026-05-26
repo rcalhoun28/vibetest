@@ -1,4 +1,6 @@
 const STORAGE_KEY = "lingualift-progress";
+const LESSON_STEPS = ["intro", "grammar", "vocab", "phrases", "review"];
+const STEP_LABELS = ["Introduction", "Grammar", "Vocabulary", "Phrases", "Review"];
 
 const screens = {
   home: document.getElementById("screen-home"),
@@ -20,16 +22,20 @@ const fluencyDetail = document.getElementById("fluency-detail");
 const courseFlag = document.getElementById("course-flag");
 const courseTitle = document.getElementById("course-title");
 const courseLevel = document.getElementById("course-level");
+const lessonStepLabel = document.getElementById("lesson-step-label");
+const lessonStepDots = document.getElementById("lesson-step-dots");
 const lessonNumber = document.getElementById("lesson-number");
 const lessonTitle = document.getElementById("lesson-title");
-const lessonGrammar = document.getElementById("lesson-grammar");
-const vocabList = document.getElementById("vocab-list");
-const phraseList = document.getElementById("phrase-list");
-const startQuizBtn = document.getElementById("start-quiz-btn");
+const lessonStepContent = document.getElementById("lesson-step-content");
+const lessonPrev = document.getElementById("lesson-prev");
+const lessonNext = document.getElementById("lesson-next");
+const quizLessonName = document.getElementById("quiz-lesson-name");
 const quizProgress = document.getElementById("quiz-progress");
 const quizProgressFill = document.getElementById("quiz-progress-fill");
 const quizScoreLive = document.getElementById("quiz-score-live");
 const quizQuestion = document.getElementById("quiz-question");
+const quizHint = document.getElementById("quiz-hint");
+const quizPromptType = document.getElementById("quiz-prompt-type");
 const quizOptions = document.getElementById("quiz-options");
 const quizInput = document.getElementById("quiz-input");
 const quizSubmit = document.getElementById("quiz-submit");
@@ -46,6 +52,7 @@ const resultsRetry = document.getElementById("results-retry");
 let state = {
   lang: null,
   lessonId: null,
+  lessonStep: 0,
   quizIndex: 0,
   quizCorrect: 0,
   quizAnswered: false,
@@ -72,6 +79,10 @@ function getLangProgress(lang) {
   return all[lang];
 }
 
+function getLesson(lang, lessonId) {
+  return COURSES[lang].lessons.find((l) => l.id === lessonId);
+}
+
 function calcFluency(lang) {
   const course = COURSES[lang];
   if (!course) return 0;
@@ -96,8 +107,17 @@ function navigateBack() {
   const active = Object.keys(screens).find((k) => screens[k].classList.contains("active"));
   if (active === "course" || active === "results") {
     showCourse(state.lang);
-  } else if (active === "lesson" || active === "quiz") {
+  } else if (active === "quiz") {
     openLesson(state.lang, state.lessonId);
+    state.lessonStep = LESSON_STEPS.length - 1;
+    renderLessonStep();
+  } else if (active === "lesson") {
+    if (state.lessonStep > 0) {
+      state.lessonStep--;
+      renderLessonStep();
+    } else {
+      showCourse(state.lang);
+    }
   } else {
     showHome();
   }
@@ -148,14 +168,15 @@ function showCourse(lang) {
   course.lessons.forEach((lesson, i) => {
     const done = prog.completed.includes(lesson.id);
     const best = prog.bestScores[lesson.id];
+    const isIntro = lesson.id === 0;
     const item = document.createElement("button");
     item.type = "button";
-    item.className = `lesson-item${done ? " done" : ""}`;
+    item.className = `lesson-item${done ? " done" : ""}${isIntro ? " intro-lesson" : ""}`;
     item.innerHTML = `
-      <span class="lesson-item-num">${i + 1}</span>
+      <span class="lesson-item-num">${isIntro ? "★" : i}</span>
       <div class="lesson-item-body">
-        <span class="lesson-item-title">${lesson.title}</span>
-        <span class="lesson-item-meta">${lesson.vocab.length} words · ${lesson.quiz.length} quiz questions${best != null ? ` · Best ${best}%` : ""}</span>
+        <span class="lesson-item-title">${lesson.title}${isIntro ? " (Start here)" : ""}</span>
+        <span class="lesson-item-meta">5 intro steps · ${lesson.quiz.length} quiz questions${best != null ? ` · Best ${best}%` : ""}</span>
       </div>
       <span class="lesson-item-status">${done ? "✓" : "→"}</span>
     `;
@@ -169,49 +190,110 @@ function showCourse(lang) {
 function openLesson(lang, lessonId) {
   state.lang = lang;
   state.lessonId = lessonId;
-  const lesson = COURSES[lang].lessons.find((l) => l.id === lessonId);
+  state.lessonStep = 0;
+  const lesson = getLesson(lang, lessonId);
 
-  lessonNumber.textContent = `Lesson ${lesson.id}`;
+  lessonNumber.textContent = lesson.id === 0 ? "Introductory lesson" : `Lesson ${lesson.id}`;
   lessonTitle.textContent = lesson.title;
-  lessonGrammar.textContent = lesson.grammar;
 
-  vocabList.innerHTML = lesson.vocab
-    .map(
-      (v) => `
-      <div class="vocab-card">
-        <span class="vocab-term">${v.term}</span>
-        <span class="vocab-meaning">${v.meaning}</span>
-      </div>`
-    )
-    .join("");
+  lessonStepDots.innerHTML = STEP_LABELS.map(
+    (_, i) => `<span class="step-dot${i === 0 ? " active" : ""}"></span>`
+  ).join("");
 
-  phraseList.innerHTML = lesson.phrases
-    .map(
-      (p) => `
-      <div class="phrase-card">
-        <span class="phrase-term">${p.term}</span>
-        <span class="phrase-meaning">${p.meaning}</span>
-      </div>`
-    )
-    .join("");
-
+  renderLessonStep();
   showScreen("lesson");
 }
 
-function normalize(s) {
-  return s
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+function renderLessonStep() {
+  const lesson = getLesson(state.lang, state.lessonId);
+  const step = LESSON_STEPS[state.lessonStep];
+  const stepNum = state.lessonStep + 1;
+
+  lessonStepLabel.textContent = `Step ${stepNum} of ${LESSON_STEPS.length}: ${STEP_LABELS[state.lessonStep]}`;
+  lessonStepDots.querySelectorAll(".step-dot").forEach((dot, i) => {
+    dot.classList.toggle("active", i === state.lessonStep);
+    dot.classList.toggle("done", i < state.lessonStep);
+  });
+
+  lessonPrev.hidden = state.lessonStep === 0;
+  lessonNext.textContent =
+    state.lessonStep === LESSON_STEPS.length - 1 ? "Start quiz" : "Next step";
+
+  if (step === "intro") {
+    lessonStepContent.innerHTML = `
+      <p class="intro-text">${lesson.intro}</p>
+      <h3 class="block-heading">What you will learn</h3>
+      <ul class="objectives-list">
+        ${lesson.objectives.map((o) => `<li>${o}</li>`).join("")}
+      </ul>
+      <p class="intro-note">Complete all ${LESSON_STEPS.length} steps before taking the quiz.</p>
+    `;
+  } else if (step === "grammar") {
+    lessonStepContent.innerHTML = `
+      <h3 class="block-heading">Grammar tip</h3>
+      <p class="grammar-box">${lesson.grammar}</p>
+      <p class="intro-note">Read this carefully—it will help you answer quiz questions.</p>
+    `;
+  } else if (step === "vocab") {
+    lessonStepContent.innerHTML = `
+      <h3 class="block-heading">Vocabulary</h3>
+      <p class="step-desc">Study each word. Try covering the meaning and guessing first.</p>
+      <div class="vocab-list">
+        ${lesson.vocab
+          .map(
+            (v) => `
+          <div class="vocab-card">
+            <span class="vocab-term">${v.term}</span>
+            <span class="vocab-meaning">${v.meaning}</span>
+          </div>`
+          )
+          .join("")}
+      </div>
+    `;
+  } else if (step === "phrases") {
+    lessonStepContent.innerHTML = `
+      <h3 class="block-heading">Useful phrases</h3>
+      <p class="step-desc">These phrases appear in real conversations.</p>
+      <div class="phrase-list">
+        ${lesson.phrases
+          .map(
+            (p) => `
+          <div class="phrase-card">
+            <span class="phrase-term">${p.term}</span>
+            <span class="phrase-meaning">${p.meaning}</span>
+          </div>`
+          )
+          .join("")}
+      </div>
+    `;
+  } else if (step === "review") {
+    const sample = lesson.vocab.slice(0, 3);
+    lessonStepContent.innerHTML = `
+      <h3 class="block-heading">Quick review</h3>
+      <p class="step-desc">You're ready for the quiz! Review these highlights:</p>
+      <div class="review-grid">
+        ${sample.map((v) => `<div class="review-chip"><strong>${v.term}</strong> — ${v.meaning}</div>`).join("")}
+      </div>
+      <p class="quiz-ready">The quiz has <strong>${lesson.quiz.length} questions</strong>. You need 70% to pass and earn fluency progress.</p>
+    `;
+  }
+}
+
+function buildQuizQuestions(lesson) {
+  return shuffle([...lesson.quiz]);
 }
 
 function startQuiz() {
-  const lesson = COURSES[state.lang].lessons.find((l) => l.id === state.lessonId);
-  state.questions = shuffle([...lesson.quiz]);
+  const lesson = getLesson(state.lang, state.lessonId);
+  state.questions = buildQuizQuestions(lesson);
+  if (!state.questions.length) {
+    alert("This lesson has no quiz questions yet.");
+    return;
+  }
   state.quizIndex = 0;
   state.quizCorrect = 0;
   state.quizAnswered = false;
+  quizLessonName.textContent = lesson.title;
   showScreen("quiz");
   renderQuizQuestion();
 }
@@ -233,11 +315,16 @@ function renderQuizQuestion() {
   quizProgressFill.style.width = `${(state.quizIndex / total) * 100}%`;
   quizScoreLive.textContent = `${state.quizCorrect} correct`;
   quizQuestion.textContent = q.q;
+  quizHint.hidden = !q.hint;
+  quizHint.textContent = q.hint ? `Hint: ${q.hint}` : "";
+  quizPromptType.textContent =
+    q.type === "mcq" ? "Choose the correct answer:" : "Type your answer:";
   quizFeedback.hidden = true;
   quizNext.hidden = true;
   quizOptions.innerHTML = "";
   quizInput.hidden = true;
   quizSubmit.hidden = true;
+  quizInput.disabled = false;
   state.quizAnswered = false;
 
   if (q.type === "mcq") {
@@ -259,6 +346,14 @@ function renderQuizQuestion() {
       if (e.key === "Enter") checkAnswer(quizInput.value, q.a);
     };
   }
+}
+
+function normalize(s) {
+  return s
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 function checkAnswer(selected, correct) {
@@ -296,10 +391,8 @@ function finishQuiz() {
   const all = loadProgress();
   const prog = getLangProgress(state.lang);
 
-  if (passed) {
-    if (!prog.completed.includes(state.lessonId)) {
-      prog.completed.push(state.lessonId);
-    }
+  if (passed && !prog.completed.includes(state.lessonId)) {
+    prog.completed.push(state.lessonId);
   }
 
   const prevBest = prog.bestScores[state.lessonId] || 0;
@@ -309,17 +402,30 @@ function finishQuiz() {
 
   resultsEmoji.textContent = passed ? "🎉" : "📚";
   resultsTitle.textContent = passed ? "Lesson passed!" : "Keep practicing";
-  resultsScore.textContent = `${state.quizCorrect} / ${total} correct (${pct}%)`;
+  resultsScore.textContent = `${state.quizCorrect} / ${total} questions correct (${pct}%)`;
   resultsXp.textContent = passed
-    ? "+20 fluency points toward your goal"
-    : "Score 70% or higher to complete this lesson";
+    ? "Great work! Your fluency score increased."
+    : "Score 70% or higher to complete this lesson.";
   resultsFluency.textContent = `Course fluency: ${calcFluency(state.lang)}%`;
 
   showScreen("results");
 }
 
 backBtn.addEventListener("click", navigateBack);
-startQuizBtn.addEventListener("click", startQuiz);
+lessonPrev.addEventListener("click", () => {
+  if (state.lessonStep > 0) {
+    state.lessonStep--;
+    renderLessonStep();
+  }
+});
+lessonNext.addEventListener("click", () => {
+  if (state.lessonStep < LESSON_STEPS.length - 1) {
+    state.lessonStep++;
+    renderLessonStep();
+  } else {
+    startQuiz();
+  }
+});
 quizNext.addEventListener("click", () => {
   if (state.quizIndex < state.questions.length - 1) {
     state.quizIndex++;

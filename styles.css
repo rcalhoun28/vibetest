@@ -358,6 +358,121 @@ body {
   color: var(--correct);
 }
 
+.lesson-step-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.lesson-step-label {
+  font-size: 0.8rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.step-dots {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.step-dot {
+  flex: 1;
+  height: 4px;
+  background: var(--bg-elevated);
+  border-radius: 99px;
+  transition: background 0.2s ease;
+}
+
+.step-dot.active {
+  background: var(--accent);
+}
+
+.step-dot.done {
+  background: var(--correct);
+}
+
+.lesson-step-content {
+  margin-bottom: 1.25rem;
+  min-height: 200px;
+}
+
+.lesson-nav-buttons {
+  display: flex;
+  gap: 0.65rem;
+}
+
+.lesson-nav-buttons .btn {
+  flex: 1;
+}
+
+.lesson-nav-buttons .btn-secondary {
+  margin-top: 0;
+}
+
+.intro-text,
+.step-desc {
+  color: rgba(240, 242, 246, 0.9);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.objectives-list {
+  list-style: none;
+  margin-bottom: 1rem;
+}
+
+.objectives-list li {
+  padding: 0.5rem 0 0.5rem 1.25rem;
+  position: relative;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.objectives-list li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.intro-note,
+.quiz-ready {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 0.75rem;
+}
+
+.review-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.review-chip {
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+}
+
+.review-chip strong {
+  color: var(--accent);
+}
+
+.lesson-item.intro-lesson {
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+.lesson-item.intro-lesson .lesson-item-num {
+  background: var(--gold-dim);
+  color: var(--gold);
+}
+
 .lesson-badge {
   display: inline-block;
   font-size: 0.7rem;
@@ -470,12 +585,56 @@ body {
   background: var(--surface-hover);
 }
 
+.quiz-header-banner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.quiz-banner-label {
+  display: block;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.quiz-banner-title {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+}
+
 .quiz-meta {
   display: flex;
   justify-content: space-between;
   font-size: 0.85rem;
   color: var(--text-muted);
   margin-bottom: 0.5rem;
+}
+
+.question-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--gold);
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.quiz-hint {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-bottom: 0.5rem;
+}
+
+.quiz-prompt-type {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
 }
 
 .quiz-score-live {

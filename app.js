@@ -8,6 +8,7 @@ const screens = {
   home: document.getElementById("screen-home"),
   course: document.getElementById("screen-course"),
   lesson: document.getElementById("screen-lesson"),
+  practice: document.getElementById("screen-practice"),
   quiz: document.getElementById("screen-quiz"),
   results: document.getElementById("screen-results"),
 };
@@ -31,6 +32,13 @@ const lessonTitle = document.getElementById("lesson-title");
 const lessonStepContent = document.getElementById("lesson-step-content");
 const lessonPrev = document.getElementById("lesson-prev");
 const lessonNext = document.getElementById("lesson-next");
+const practiceLessonName = document.getElementById("practice-lesson-name");
+const practiceStepText = document.getElementById("practice-step-text");
+const practiceProgressFill = document.getElementById("practice-progress-fill");
+const practiceContent = document.getElementById("practice-content");
+const practiceFeedback = document.getElementById("practice-feedback");
+const practiceNext = document.getElementById("practice-next");
+const practiceSkip = document.getElementById("practice-skip");
 const quizLessonName = document.getElementById("quiz-lesson-name");
 const quizProgress = document.getElementById("quiz-progress");
 const quizProgressFill = document.getElementById("quiz-progress-fill");
@@ -59,7 +67,12 @@ let state = {
   quizCorrect: 0,
   quizAnswered: false,
   questions: [],
+  practiceIndex: 0,
+  practiceExercises: [],
 };
+
+let matchSelection = null;
+let matchedCount = 0;
 
 function loadProgress() {
   try {
@@ -109,7 +122,7 @@ function navigateBack() {
   const active = Object.keys(screens).find((k) => screens[k].classList.contains("active"));
   if (active === "course" || active === "results") {
     showCourse(state.lang);
-  } else if (active === "quiz") {
+  } else if (active === "quiz" || active === "practice") {
     openLesson(state.lang, state.lessonId);
     state.lessonStep = LESSON_STEPS.length - 1;
     renderLessonStep();
@@ -178,7 +191,7 @@ function showCourse(lang) {
       <span class="lesson-item-num">${isIntro ? "★" : i}</span>
       <div class="lesson-item-body">
         <span class="lesson-item-title">${lesson.title}${isIntro ? " (Start here)" : ""}</span>
-        <span class="lesson-item-meta">5 intro steps · ${lesson.quiz.length} quiz questions${best != null ? ` · Best ${best}%` : ""}</span>
+        <span class="lesson-item-meta">5 steps · practice · ${lesson.quiz.length} quiz questions${best != null ? ` · Best ${best}%` : ""}</span>
       </div>
       <span class="lesson-item-status">${done ? "✓" : "→"}</span>
     `;
@@ -219,7 +232,7 @@ function renderLessonStep() {
 
   lessonPrev.hidden = state.lessonStep === 0;
   lessonNext.textContent =
-    state.lessonStep === LESSON_STEPS.length - 1 ? "Start quiz" : "Next step";
+    state.lessonStep === LESSON_STEPS.length - 1 ? "Start practice" : "Next step";
 
   if (step === "intro") {
     lessonStepContent.innerHTML = `
@@ -272,13 +285,223 @@ function renderLessonStep() {
     const sample = lesson.vocab.slice(0, 3);
     lessonStepContent.innerHTML = `
       <h3 class="block-heading">Quick review</h3>
-      <p class="step-desc">You're ready for the quiz! Review these highlights:</p>
+      <p class="step-desc">You're almost there! Highlights from this lesson:</p>
       <div class="review-grid">
         ${sample.map((v) => `<div class="review-chip"><strong>${v.term}</strong> — ${v.meaning}</div>`).join("")}
       </div>
-      <p class="quiz-ready">The quiz has <strong>${lesson.quiz.length} questions</strong>. You need 70% to pass and earn fluency progress.</p>
+      <p class="quiz-ready">Next, a short <strong>interactive practice</strong> (matching + fill-ins) to warm up, then your <strong>${lesson.quiz.length}-question quiz</strong>. You need 70% to pass.</p>
     `;
   }
+}
+
+function buildPracticeExercises(lesson) {
+  const exercises = [];
+
+  if (lesson.vocab && lesson.vocab.length >= 3) {
+    const pairs = shuffle([...lesson.vocab])
+      .slice(0, Math.min(4, lesson.vocab.length))
+      .map((v) => ({ term: v.term, meaning: v.meaning }));
+    exercises.push({
+      type: "match",
+      title: "Match each word",
+      subtitle: "Tap a word, then tap its meaning to pair them.",
+      leftLabel: "Words",
+      rightLabel: "Meanings",
+      pairs,
+    });
+  }
+
+  if (lesson.phrases && lesson.phrases.length >= 2) {
+    const pairs = shuffle([...lesson.phrases])
+      .slice(0, Math.min(3, lesson.phrases.length))
+      .map((p) => ({ term: p.term, meaning: p.meaning }));
+    exercises.push({
+      type: "match",
+      title: "Match the phrases",
+      subtitle: "Connect each phrase with its English meaning.",
+      leftLabel: "Phrases",
+      rightLabel: "Meanings",
+      pairs,
+    });
+  }
+
+  if (lesson.vocab && lesson.vocab.length) {
+    const candidates = lesson.vocab.filter((v) => !v.term.includes("/"));
+    const pool = candidates.length ? candidates : lesson.vocab;
+    const picks = shuffle([...pool]).slice(0, Math.min(2, pool.length));
+    picks.forEach((item) => {
+      const term = item.term.split(/\s*\/\s*/)[0];
+      const meaning = item.meaning.split(/\s*\/\s*/)[0];
+      exercises.push({
+        type: "type",
+        title: "Type the word",
+        subtitle: "Write the term that matches this meaning.",
+        meaning,
+        term,
+      });
+    });
+  }
+
+  return exercises;
+}
+
+function startPractice() {
+  const lesson = getLesson(state.lang, state.lessonId);
+  state.practiceExercises = buildPracticeExercises(lesson);
+  state.practiceIndex = 0;
+
+  if (!state.practiceExercises.length) {
+    startQuiz();
+    return;
+  }
+
+  practiceLessonName.textContent = lesson.title;
+  showScreen("practice");
+  renderPracticeExercise();
+}
+
+function renderPracticeExercise() {
+  const ex = state.practiceExercises[state.practiceIndex];
+  const total = state.practiceExercises.length;
+  matchSelection = null;
+  matchedCount = 0;
+
+  practiceStepText.textContent = `Exercise ${state.practiceIndex + 1} of ${total}`;
+  practiceProgressFill.style.width = `${(state.practiceIndex / total) * 100}%`;
+  practiceFeedback.hidden = true;
+  practiceNext.hidden = true;
+  practiceNext.textContent =
+    state.practiceIndex === total - 1 ? "Start quiz →" : "Next exercise";
+  practiceContent.innerHTML = "";
+
+  if (ex.type === "match") {
+    renderMatchExercise(ex);
+  } else if (ex.type === "type") {
+    renderTypeExercise(ex);
+  }
+}
+
+function renderMatchExercise(ex) {
+  practiceContent.innerHTML = `
+    <h3 class="practice-exercise-title">${ex.title}</h3>
+    <p class="practice-exercise-subtitle">${ex.subtitle}</p>
+    <div class="match-grid">
+      <div class="match-column">
+        <span class="match-column-label">${ex.leftLabel}</span>
+        <div id="match-terms" class="match-column"></div>
+      </div>
+      <div class="match-column">
+        <span class="match-column-label">${ex.rightLabel}</span>
+        <div id="match-meanings" class="match-column"></div>
+      </div>
+    </div>
+  `;
+
+  const termsCol = document.getElementById("match-terms");
+  const meaningsCol = document.getElementById("match-meanings");
+  const totalPairs = ex.pairs.length;
+
+  const terms = shuffle([...ex.pairs]);
+  const meanings = shuffle([...ex.pairs]);
+
+  terms.forEach((p) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "match-item match-term";
+    btn.textContent = p.term;
+    btn.dataset.match = p.term;
+    btn.addEventListener("click", () => handleMatchClick(btn, "term", totalPairs));
+    termsCol.appendChild(btn);
+  });
+
+  meanings.forEach((p) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "match-item match-meaning";
+    btn.textContent = p.meaning;
+    btn.dataset.match = p.term;
+    btn.addEventListener("click", () => handleMatchClick(btn, "meaning", totalPairs));
+    meaningsCol.appendChild(btn);
+  });
+}
+
+function handleMatchClick(btn, side, totalPairs) {
+  if (btn.classList.contains("matched") || btn.disabled) return;
+
+  if (!matchSelection) {
+    btn.classList.add("selected");
+    matchSelection = { btn, side };
+    return;
+  }
+
+  if (matchSelection.side === side) {
+    matchSelection.btn.classList.remove("selected");
+    btn.classList.add("selected");
+    matchSelection = { btn, side };
+    return;
+  }
+
+  const isMatch = matchSelection.btn.dataset.match === btn.dataset.match;
+  const prev = matchSelection;
+  matchSelection = null;
+
+  if (isMatch) {
+    prev.btn.classList.remove("selected");
+    prev.btn.classList.add("matched");
+    btn.classList.add("matched");
+    prev.btn.disabled = true;
+    btn.disabled = true;
+    matchedCount++;
+
+    if (matchedCount === totalPairs) {
+      practiceFeedback.hidden = false;
+      practiceFeedback.className = "quiz-feedback correct";
+      practiceFeedback.textContent = "All matched — nice work!";
+      practiceNext.hidden = false;
+    }
+  } else {
+    prev.btn.classList.add("wrong-flash");
+    btn.classList.add("wrong-flash");
+    setTimeout(() => {
+      prev.btn.classList.remove("wrong-flash", "selected");
+      btn.classList.remove("wrong-flash");
+    }, 500);
+  }
+}
+
+function renderTypeExercise(ex) {
+  practiceContent.innerHTML = `
+    <h3 class="practice-exercise-title">${ex.title}</h3>
+    <p class="practice-exercise-subtitle">${ex.subtitle}</p>
+    <div class="practice-prompt-meaning">${ex.meaning}</div>
+    <div class="practice-input-row">
+      <input id="practice-input" type="text" class="quiz-input" placeholder="Type the word…" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      <button id="practice-check" type="button" class="btn btn-secondary">Check answer</button>
+    </div>
+  `;
+
+  const input = document.getElementById("practice-input");
+  const checkBtn = document.getElementById("practice-check");
+  input.focus();
+
+  const submit = () => {
+    if (input.disabled) return;
+    const value = input.value;
+    const isCorrect = normalize(value) === normalize(ex.term);
+    practiceFeedback.hidden = false;
+    practiceFeedback.className = `quiz-feedback ${isCorrect ? "correct" : "wrong"}`;
+    practiceFeedback.textContent = isCorrect
+      ? "Correct!"
+      : `Almost — the answer is: ${ex.term}`;
+    input.disabled = true;
+    checkBtn.hidden = true;
+    practiceNext.hidden = false;
+  };
+
+  checkBtn.addEventListener("click", submit);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") submit();
+  });
 }
 
 function buildQuizQuestions(lesson) {
@@ -425,7 +648,7 @@ lessonNext.addEventListener("click", () => {
     state.lessonStep++;
     renderLessonStep();
   } else {
-    startQuiz();
+    startPractice();
   }
 });
 quizNext.addEventListener("click", () => {
@@ -437,6 +660,16 @@ quizNext.addEventListener("click", () => {
     finishQuiz();
   }
 });
+practiceNext.addEventListener("click", () => {
+  if (state.practiceIndex < state.practiceExercises.length - 1) {
+    state.practiceIndex++;
+    renderPracticeExercise();
+  } else {
+    practiceProgressFill.style.width = "100%";
+    startQuiz();
+  }
+});
+practiceSkip.addEventListener("click", () => startQuiz());
 resultsContinue.addEventListener("click", () => showCourse(state.lang));
 resultsRetry.addEventListener("click", () => startQuiz());
 

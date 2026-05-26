@@ -2,7 +2,7 @@ const STORAGE_KEY = "lingualift-progress";
 const LESSON_STEPS = ["intro", "grammar", "vocab", "phrases", "review"];
 const STEP_LABELS = ["Introduction", "Grammar", "Vocabulary", "Phrases", "Review"];
 
-// hi 
+// hi this is rowan
 
 const screens = {
   home: document.getElementById("screen-home"),

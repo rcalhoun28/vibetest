@@ -85,6 +85,27 @@ body {
   background: var(--surface-hover);
 }
 
+.home-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.05rem;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.home-btn:hover {
+  background: var(--surface-hover);
+  transform: translateY(-1px);
+}
+
 .logo {
   display: flex;
   align-items: center;

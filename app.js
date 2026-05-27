@@ -14,6 +14,7 @@ const screens = {
 };
 
 const backBtn = document.getElementById("back-btn");
+const homeBtn = document.getElementById("home-btn");
 const headerSub = document.getElementById("header-sub");
 const headerXp = document.getElementById("header-xp");
 const headerXpValue = document.getElementById("header-xp-value");
@@ -112,6 +113,7 @@ function showScreen(name) {
     el.classList.toggle("active", key === name);
   });
   backBtn.hidden = name === "home";
+  homeBtn.hidden = name === "home";
   headerXp.hidden = !state.lang || name === "home";
   if (state.lang) {
     headerXpValue.textContent = `${calcFluency(state.lang)}%`;
@@ -637,6 +639,7 @@ function finishQuiz() {
 }
 
 backBtn.addEventListener("click", navigateBack);
+homeBtn.addEventListener("click", showHome);
 lessonPrev.addEventListener("click", () => {
   if (state.lessonStep > 0) {
     state.lessonStep--;
